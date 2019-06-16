@@ -6,10 +6,6 @@ import (
 	"github.com/mashiike/comb"
 )
 
-func init() {
-	comb.SetRngSeed(1)
-}
-
 func ExampleSlice() {
 	target := []float64{1.0, 2.0, 3.0, 3.5, 4.0, 3.8}
 	score := func(ind []int) float64 {
@@ -32,7 +28,7 @@ func ExampleSlice() {
 		}
 		return (max - min) * (max - min)
 	}
-	groups := comb.Slice(target, 4, energy)
+	groups := comb.Slice(target, 4, energy, comb.Seed(1))
 
 	for _, group := range groups {
 		fmt.Printf("[")

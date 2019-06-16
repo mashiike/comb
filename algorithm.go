@@ -10,36 +10,55 @@ import (
 	"github.com/seehuhn/mt19937"
 )
 
-var rng *rand.Rand
-
-func init() {
-	seed, _ := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
-	rng = rand.New(mt19937.New())
-	rng.Seed(seed.Int64())
+type Config struct {
+	maxIter int
+	rng     *rand.Rand
 }
+
+type Option func(*Config)
 
 type simulatedAnnealing struct {
 	length     int
 	groupCount int
-	score      func([][]int) float64
+	energy     func([][]int) float64
+	config     *Config
+}
+
+func newSimulatedAnneling(length, groupCount int, energy func([][]int) float64, options ...Option) *simulatedAnnealing {
+	seed, _ := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+	rng := rand.New(mt19937.New())
+	rng.Seed(seed.Int64())
+	config := &Config{
+		maxIter: 10000,
+		rng:     rng,
+	}
+	for _, option := range options {
+		option(config)
+	}
+
+	return &simulatedAnnealing{
+		length:     length,
+		groupCount: groupCount,
+		energy:     energy,
+		config:     config,
+	}
 }
 
 func (alg *simulatedAnnealing) solve() [][]int {
 	current := alg.initState()
 	minimum := deepcopy(current)
-	minimumScore := alg.score(minimum)
+	minimumEnergy := alg.energy(minimum)
 
-	maxIter := 10000
-	for k := 0; k < maxIter; k++ {
-		i1, j1, i2, j2 := genSwapIndex(current)
+	for k := 0; k < alg.config.maxIter; k++ {
+		i1, j1, i2, j2 := genSwapIndex(current, alg.config.rng)
 		doswap(current, i1, j1, i2, j2)
-		currentScore := alg.score(current)
-		if currentScore <= minimumScore {
+		currentEnergy := alg.energy(current)
+		if currentEnergy <= minimumEnergy {
 			minimum = deepcopy(current)
-			minimumScore = currentScore
+			minimumEnergy = currentEnergy
 			continue
 		}
-		if rng.Float64() > math.Exp((minimumScore-currentScore)/(float64(maxIter-k)+0.01)) {
+		if alg.config.rng.Float64() > math.Exp((minimumEnergy-currentEnergy)/(float64(alg.config.maxIter-k)+0.01)) {
 			doswap(current, i2, j2, i1, j1)
 		}
 	}
@@ -63,7 +82,8 @@ func (alg *simulatedAnnealing) initState() [][]int {
 	}
 	return ret
 }
-func genSwapIndex(current [][]int) (i1, j1, i2, j2 int) {
+
+func genSwapIndex(current [][]int, rng *rand.Rand) (i1, j1, i2, j2 int) {
 	switch len(current) {
 	case 2:
 		i1 = 0
@@ -101,4 +121,16 @@ func groupSort(ind [][]int) [][]int {
 	}
 	sort.Slice(ind, func(i, j int) bool { return ind[i][0] < ind[j][0] })
 	return ind
+}
+
+func MaxIter(n int) Option {
+	return func(config *Config) {
+		config.maxIter = n
+	}
+}
+
+func Seed(n int64) Option {
+	return func(config *Config) {
+		config.rng.Seed(n)
+	}
 }
